@@ -1,9 +1,5 @@
 name: Update Formula
 
-permissions:
-  contents: write
-  pull-requests: write
-
 on:
   repository_dispatch:
     types: [update-formula]
@@ -17,6 +13,9 @@ on:
 jobs:
   update-formula:
     runs-on: macos-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -85,11 +84,11 @@ jobs:
         run: |
           FORMULA_FILE="Formula/patterndb-yaml.rb"
 
-          # Update URL
-          sed -i '' "s|url \".*\"|url \"$URL\"|" "$FORMULA_FILE"
+          # Update ONLY the first url line (the main package, not resources)
+          sed -i '' '0,/^  url ".*"/s||  url "'"$URL"'"|' "$FORMULA_FILE"
 
-          # Update SHA256
-          sed -i '' "s|sha256 \".*\"|sha256 \"$SHA256\"|" "$FORMULA_FILE"
+          # Update ONLY the first sha256 line (the main package, not resources)
+          sed -i '' '0,/^  sha256 ".*"/s||  sha256 "'"$SHA256"'"|' "$FORMULA_FILE"
 
           # Update version in test block if it contains version check
           sed -i '' "s|patterndb-yaml version .*|patterndb-yaml version|" "$FORMULA_FILE"
@@ -100,7 +99,6 @@ jobs:
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v7
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "chore: Update patterndb-yaml to v${{ steps.version.outputs.version }}"
           branch: "update-formula-v${{ steps.version.outputs.version }}"
           delete-branch: true
