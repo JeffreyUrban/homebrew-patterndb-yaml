@@ -3,8 +3,8 @@ class PatterndbYaml < Formula
 
   desc "YAML-based pattern matching for log normalization using syslog-ng patterndb"
   homepage "https://github.com/JeffreyUrban/patterndb-yaml"
-  url "https://files.pythonhosted.org/packages/source/p/patterndb-yaml/patterndb_yaml-0.1.0.tar.gz"
-  sha256 "PLACEHOLDER_SHA256"
+  url "https://files.pythonhosted.org/packages/c8/24/d1ead64d75da17dd03415a85cc4c2e24c6af63d1c743e87a7b4fb7ca00ae/patterndb_yaml-0.1.0.tar.gz"
+  sha256 "1a39b9f86521b1ba992253648198f47fe57bde170a3ef7372a60c6894422d211"
   license "MIT"
 
   # Runtime dependencies
@@ -14,7 +14,7 @@ class PatterndbYaml < Formula
   # Python package dependencies
   resource "typer" do
     url "https://files.pythonhosted.org/packages/source/t/typer/typer-0.15.1.tar.gz"
-    sha256 "a996c8edb93ab62c0942c3b32af71eb742be87e3821a84c8a0c2abf4a6ddf5dd"
+    sha256 "a0588c0a7fa68a1978a069818657778f86abe6ff5ea6abf472f940a08bfe4f0a"
   end
 
   resource "rich" do
@@ -49,12 +49,12 @@ class PatterndbYaml < Formula
 
   resource "pygments" do
     url "https://files.pythonhosted.org/packages/source/P/Pygments/pygments-2.18.0.tar.gz"
-    sha256 "786ff802f32e91311bff3889f6e9788e945e4bf4d4b12e78b2a5ad8b7e2e2e5c"
+    sha256 "786ff802f32e91311bff3889f6e9a86e81505fe99f2735bb6d60ae0c5004f199"
   end
 
   resource "shellingham" do
     url "https://files.pythonhosted.org/packages/source/s/shellingham/shellingham-1.5.4.tar.gz"
-    sha256 "8dbca0739d487e5bd35ab3ca4b36e11c4078f3a234bfce294b0a0291363c4e07"
+    sha256 "8dbca0739d487e5bd35ab3ca4b36e11c4078f3a234bfce294b0a0291363404de"
   end
 
   resource "typing-extensions" do
