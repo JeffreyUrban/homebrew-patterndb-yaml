@@ -14,7 +14,7 @@ class PatterndbYaml < Formula
 
   # Python package dependencies
   resource "typer" do
-    url "https://files.pythonhosted.org/packages/b8/e5/ab0e01be35ca2d5389c6c402eb54e10633aba159608d7270292b6f882a45/typer-0.15.1.tar.gz"
+    url "https://files.pythonhosted.org/packages/cb/ce/dca7b219718afd37a0068f4f2530a727c2b74a8b6e8e0c0080a4c0de4fcd/typer-0.15.1.tar.gz"
     sha256 "a0588c0a7fa68a1978a069818657778f86abe6ff5ea6abf472f940a08bfe4f0a"
   end
 
