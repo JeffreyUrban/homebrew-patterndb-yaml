@@ -9,7 +9,7 @@ class PatterndbYaml < Formula
 
   # Runtime dependencies
   depends_on "libyaml"
-  depends_on "python@3.12"
+  depends_on "python@3.14"
   depends_on "syslog-ng"
 
   # Python package dependencies
