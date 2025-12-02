@@ -3,132 +3,122 @@ name: Update Formula
 on:
   repository_dispatch:
     types: [update-formula]
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to update to (e.g., 0.1.0)'
-        required: true
-        type: string
 
 jobs:
   update-formula:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: write
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set version
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
-            VERSION="${{ github.event.client_payload.version }}"
-          else
-            VERSION="${{ inputs.version }}"
-          fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Updating formula to version $VERSION"
-
       - name: Wait for PyPI release
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
+        id: wait
         run: |
-          echo "Waiting for PyPI release of patterndb-yaml $VERSION..."
-          MAX_ATTEMPTS=60  # 10 minutes (60 * 10 seconds)
-          ATTEMPT=0
+          VERSION="${{ github.event.client_payload.version }}"
+          echo "Waiting for PyPI release of version ${VERSION}..."
 
-          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
-            if curl -sf "https://pypi.org/pypi/patterndb-yaml/$VERSION/json" > /dev/null; then
-              echo "✅ Package found on PyPI!"
+          # Wait up to 10 minutes for the release to appear on PyPI
+          MAX_ATTEMPTS=60
+          SLEEP_TIME=10
+
+          for i in $(seq 1 "$MAX_ATTEMPTS"); do
+            echo "Attempt ${i}/${MAX_ATTEMPTS}: Checking PyPI..."
+
+            # Check if version exists
+            RELEASES=$(curl -s https://pypi.org/pypi/patterndb-yaml/json | jq -r '.releases | keys[]')
+
+            if echo "$RELEASES" | grep -q "^${VERSION}$"; then
+              echo "✅ Version ${VERSION} found on PyPI!"
+              echo "release_found=true" >> "$GITHUB_OUTPUT"
               break
             fi
-            ATTEMPT=$((ATTEMPT + 1))
-            echo "Attempt $ATTEMPT/$MAX_ATTEMPTS: Package not yet available, waiting..."
-            sleep 10
-          done
 
-          if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
-            echo "❌ Timeout: Package not found on PyPI after 10 minutes"
-            exit 1
-          fi
+            if [ "$i" -eq "$MAX_ATTEMPTS" ]; then
+              echo "❌ Timeout: Version ${VERSION} not found on PyPI after ${MAX_ATTEMPTS} attempts"
+              echo "release_found=false" >> "$GITHUB_OUTPUT"
+              exit 1
+            fi
+
+            echo "Version not yet available, waiting ${SLEEP_TIME}s..."
+            sleep "$SLEEP_TIME"
+          done
 
       - name: Get package info from PyPI
         id: pypi
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
+        if: steps.wait.outputs.release_found == 'true'
         run: |
-          echo "Fetching package info from PyPI..."
-          PYPI_JSON=$(curl -s "https://pypi.org/pypi/patterndb-yaml/$VERSION/json")
+          VERSION="${{ github.event.client_payload.version }}"
+          echo "Fetching package info for version ${VERSION}"
 
-          # Get the sdist (source distribution) URL and SHA256
-          URL=$(echo "$PYPI_JSON" | jq -r '.urls[] | select(.packagetype=="sdist") | .url')
-          SHA256=$(echo "$PYPI_JSON" | jq -r '.urls[] | select(.packagetype=="sdist") | .digests.sha256')
+          # Get source distribution info
+          INFO=$(curl -s https://pypi.org/pypi/patterndb-yaml/json | jq -r ".releases[\"${VERSION}\"][] | select(.packagetype==\"sdist\")")
+          URL=$(echo "$INFO" | jq -r '.url')
+          SHA256=$(echo "$INFO" | jq -r '.digests.sha256')
 
           if [ -z "$URL" ] || [ -z "$SHA256" ]; then
-            echo "❌ Failed to get package URL or SHA256 from PyPI"
+            echo "❌ Error: Could not fetch package info from PyPI"
             exit 1
           fi
 
-          echo "url=$URL" >> $GITHUB_OUTPUT
-          echo "sha256=$SHA256" >> $GITHUB_OUTPUT
-          echo "Package URL: $URL"
-          echo "Package SHA256: $SHA256"
+          echo "url=${URL}" >> "$GITHUB_OUTPUT"
+          echo "sha256=${SHA256}" >> "$GITHUB_OUTPUT"
+          echo "✅ Package URL: ${URL}"
+          echo "✅ SHA256: ${SHA256}"
 
       - name: Update formula
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-          URL: ${{ steps.pypi.outputs.url }}
-          SHA256: ${{ steps.pypi.outputs.sha256 }}
         run: |
-          FORMULA_FILE="Formula/patterndb-yaml.rb"
+          VERSION="${{ github.event.client_payload.version }}"
+          URL="${{ steps.pypi.outputs.url }}"
+          SHA256="${{ steps.pypi.outputs.sha256 }}"
 
-          # Update ONLY the first url line (the main package, not resources)
-          sed -i '' '0,/^  url ".*"/s||  url "'"$URL"'"|' "$FORMULA_FILE"
+          # Update main package URL and SHA256
+          sed -i "s|url \"https://files.pythonhosted.org/packages/.*/patterndb-yaml-.*\.tar\.gz\"|url \"${URL}\"|" Formula/patterndb-yaml.rb
 
-          # Update ONLY the first sha256 line (the main package, not resources)
-          sed -i '' '0,/^  sha256 ".*"/s||  sha256 "'"$SHA256"'"|' "$FORMULA_FILE"
+          # Find the sha256 line that follows the patterndb-yaml url and update it
+          awk -v url="${URL}" -v sha="${SHA256}" '
+            /url "https:.*patterndb-yaml-/ { print; getline; sub(/sha256 ".*"/, "sha256 \"" sha "\""); print; next }
+            {print}
+          ' Formula/patterndb-yaml.rb > Formula/patterndb-yaml.rb.tmp
+          mv Formula/patterndb-yaml.rb.tmp Formula/patterndb-yaml.rb
 
-          # Update version in test block if it contains version check
-          sed -i '' "s|patterndb-yaml version .*|patterndb-yaml version|" "$FORMULA_FILE"
+          # Update version in test
+          sed -i "s/assert_match \"patterndb-yaml version .*/assert_match \"patterndb-yaml version $VERSION\", output/" Formula/patterndb-yaml.rb
 
-          echo "Formula updated successfully"
-          git diff "$FORMULA_FILE"
+          echo "✅ Formula updated"
+
+      - name: Verify changes
+        run: |
+          echo "=== Changes to Formula/patterndb-yaml.rb ==="
+          git diff Formula/patterndb-yaml.rb
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v6
         with:
-          commit-message: "chore: Update patterndb-yaml to v${{ steps.version.outputs.version }}"
-          branch: "update-formula-v${{ steps.version.outputs.version }}"
-          delete-branch: true
-          title: "Update patterndb-yaml to v${{ steps.version.outputs.version }}"
+          commit-message: "chore: Update patterndb-yaml to v${{ github.event.client_payload.version }}"
+          title: "Update patterndb-yaml to v${{ github.event.client_payload.version }}"
           body: |
-            ## Update patterndb-yaml formula
+            Automatically generated PR to update patterndb-yaml formula.
 
-            This PR updates the Homebrew formula to version **${{ steps.version.outputs.version }}**.
+            **Version:** ${{ github.event.client_payload.version }}
+            **PyPI Release:** https://pypi.org/project/patterndb-yaml/${{ github.event.client_payload.version }}/
 
             ### Changes
-            - **Version**: ${{ steps.version.outputs.version }}
-            - **URL**: ${{ steps.pypi.outputs.url }}
-            - **SHA256**: `${{ steps.pypi.outputs.sha256 }}`
+            - Updated source URL and SHA256 hash
+            - Updated version test assertion
 
-            ### PyPI Release
-            https://pypi.org/project/patterndb-yaml/${{ steps.version.outputs.version }}/
-
-            ### Automated Update
-            This PR was automatically created by the [update-formula workflow](.github/workflows/update-formula.yml).
-
-            ### Testing
-            To test this update locally:
-            ```bash
-            brew install --build-from-source jeffreyurban/patterndb-yaml/patterndb-yaml
-            brew test patterndb-yaml
-            ```
+            ### Testing Checklist
+            - [ ] Verify SHA256 hash matches PyPI
+            - [ ] Test local installation: `brew install --build-from-source jeffreyurban/patterndb-yaml/patterndb-yaml`
+            - [ ] Run tests: `brew test patterndb-yaml`
+            - [ ] Verify version: `patterndb-yaml --version`
 
             ---
-
-            **Triggered by**: ${{ github.event_name == 'repository_dispatch' && 'Release in main repository' || 'Manual workflow dispatch' }}
+            *This PR was automatically created by the update-formula workflow triggered from the main patterndb-yaml repository.*
+          branch: update-v${{ github.event.client_payload.version }}
+          delete-branch: true
           labels: |
             automated
-            formula-update
+            version-update
