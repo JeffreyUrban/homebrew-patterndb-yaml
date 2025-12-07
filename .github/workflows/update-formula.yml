@@ -97,11 +97,13 @@ jobs:
           SHA256="${{ steps.pypi.outputs.sha256 }}"
 
           # Update main package URL and SHA256
-          sed -i "s|url \"https://files.pythonhosted.org/packages/.*/patterndb-yaml-.*\.tar\.gz\"|url \"${URL}\"|" Formula/patterndb-yaml.rb
+          # Note: PyPI uses patterndb_yaml (underscore) in package filename
+          sed -i "s|url \"https://files.pythonhosted.org/packages/.*/patterndb[_-]yaml-.*\.tar\.gz\"|url \"${URL}\"|" Formula/patterndb-yaml.rb
 
-          # Find the sha256 line that follows the patterndb-yaml url and update it
+          # Find the sha256 line that follows the patterndb package url and update it
+          # Note: Match both patterndb-yaml and patterndb_yaml
           awk -v url="${URL}" -v sha="${SHA256}" '
-            /url "https:.*patterndb-yaml-/ { print; getline; sub(/sha256 ".*"/, "sha256 \"" sha "\""); print; next }
+            /url "https:.*patterndb[_-]yaml-/ { print; getline; sub(/sha256 ".*"/, "sha256 \"" sha "\""); print; next }
             {print}
           ' Formula/patterndb-yaml.rb > Formula/patterndb-yaml.rb.tmp
           mv Formula/patterndb-yaml.rb.tmp Formula/patterndb-yaml.rb
