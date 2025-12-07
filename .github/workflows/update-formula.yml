@@ -119,6 +119,7 @@ jobs:
           git diff Formula/patterndb-yaml.rb
 
       - name: Create Pull Request
+        id: create-pr
         uses: peter-evans/create-pull-request@v6
         with:
           commit-message: "chore: Update patterndb-yaml to v${{ github.event.client_payload.version }}"
@@ -146,3 +147,14 @@ jobs:
           labels: |
             automated
             version-update
+
+      - name: Verify PR was created
+        run: |
+          if [ -z "${{ steps.create-pr.outputs.pull-request-number }}" ]; then
+            echo "❌ Error: No pull request was created!"
+            echo "This likely means no changes were detected in the formula."
+            echo "Check the 'Update formula' step output to verify the sed/awk commands matched correctly."
+            exit 1
+          fi
+          echo "✅ Pull request #${{ steps.create-pr.outputs.pull-request-number }} created successfully"
+          echo "PR URL: ${{ steps.create-pr.outputs.pull-request-url }}"
