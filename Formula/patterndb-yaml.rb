@@ -3,8 +3,8 @@ class PatterndbYaml < Formula
 
   desc "YAML-based pattern matching for log normalization using syslog-ng patterndb"
   homepage "https://github.com/JeffreyUrban/patterndb-yaml"
-  url "https://files.pythonhosted.org/packages/c8/24/d1ead64d75da17dd03415a85cc4c2e24c6af63d1c743e87a7b4fb7ca00ae/patterndb_yaml-0.1.0.tar.gz"
-  sha256 "1a39b9f86521b1ba992253648198f47fe57bde170a3ef7372a60c6894422d211"
+  url "https://files.pythonhosted.org/packages/09/73/720b0956ca345fe3012d635a3cd1954e531aff881d81eac5f15e3cd58db8/patterndb_yaml-0.2.0.tar.gz"
+  sha256 "9cf8a0b4a3c4ab2995eb3074dc70989c42aa4ca37aefcc3e964ff2d7710fa9ba"
   license "MIT"
 
   # Runtime dependencies
