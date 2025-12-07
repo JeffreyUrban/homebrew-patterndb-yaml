@@ -53,20 +53,42 @@ jobs:
           VERSION="${{ github.event.client_payload.version }}"
           echo "Fetching package info for version ${VERSION}"
 
-          # Get source distribution info
-          INFO=$(curl -s https://pypi.org/pypi/patterndb-yaml/json | jq -r ".releases[\"${VERSION}\"][] | select(.packagetype==\"sdist\")")
-          URL=$(echo "$INFO" | jq -r '.url')
-          SHA256=$(echo "$INFO" | jq -r '.digests.sha256')
+          # Wait a bit longer for package metadata to be fully available
+          echo "Waiting additional 30 seconds for package metadata to propagate..."
+          sleep 30
 
-          if [ -z "$URL" ] || [ -z "$SHA256" ]; then
-            echo "❌ Error: Could not fetch package info from PyPI"
-            exit 1
-          fi
+          # Retry fetching package info with exponential backoff
+          MAX_ATTEMPTS=5
+          ATTEMPT=1
 
-          echo "url=${URL}" >> "$GITHUB_OUTPUT"
-          echo "sha256=${SHA256}" >> "$GITHUB_OUTPUT"
-          echo "✅ Package URL: ${URL}"
-          echo "✅ SHA256: ${SHA256}"
+          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+            echo "Attempt ${ATTEMPT}/${MAX_ATTEMPTS}: Fetching package info..."
+
+            # Get source distribution info
+            INFO=$(curl -s https://pypi.org/pypi/patterndb-yaml/json | jq -r ".releases[\"${VERSION}\"][] | select(.packagetype==\"sdist\")")
+            URL=$(echo "$INFO" | jq -r '.url')
+            SHA256=$(echo "$INFO" | jq -r '.digests.sha256')
+
+            if [ -n "$URL" ] && [ -n "$SHA256" ] && [ "$URL" != "null" ] && [ "$SHA256" != "null" ]; then
+              echo "url=${URL}" >> "$GITHUB_OUTPUT"
+              echo "sha256=${SHA256}" >> "$GITHUB_OUTPUT"
+              echo "✅ Package URL: ${URL}"
+              echo "✅ SHA256: ${SHA256}"
+              exit 0
+            fi
+
+            if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+              echo "❌ Error: Could not fetch package info from PyPI after ${MAX_ATTEMPTS} attempts"
+              echo "URL: ${URL}"
+              echo "SHA256: ${SHA256}"
+              exit 1
+            fi
+
+            WAIT_TIME=$((ATTEMPT * 10))
+            echo "Package info not ready, waiting ${WAIT_TIME}s before retry..."
+            sleep $WAIT_TIME
+            ATTEMPT=$((ATTEMPT + 1))
+          done
 
       - name: Update formula
         run: |
